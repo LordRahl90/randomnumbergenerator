@@ -23,12 +23,12 @@ func main() {
 
 	runtime.GOMAXPROCS(4)
 	start := time.Now()
-	limit := 1000
+	limit := 100000
 
 	fileCount := 0
 
 	msgChannel := make(chan Message, 50)
-	fileChannel = make(chan string, 1)
+	fileChannel = make(chan string, 500)
 
 	innerFolderPre := "inner_"
 
