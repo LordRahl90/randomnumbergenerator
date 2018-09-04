@@ -40,7 +40,7 @@ func main() {
 
 	for fileCount < limit {
 
-		if fileCount%50 == 0 {
+		if fileCount%100 == 0 {
 			innerFolder = innerFolderPre + strconv.Itoa(fileCount)
 		}
 		if _, err := os.Stat(innerFolder); os.IsNotExist(err) {
