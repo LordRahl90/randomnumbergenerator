@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"math/rand"
@@ -10,27 +11,46 @@ import (
 	"time"
 )
 
-const folder = "./content"
+const folder = "./files"
+
+func init() {
+	rand.Seed(time.Now().Unix())
+}
+
+var fileChannel chan string
 
 func main() {
 
 	runtime.GOMAXPROCS(4)
 	start := time.Now()
-	limit := 100
-
-	if _, err := os.Stat(folder); os.IsNotExist(err) {
-		os.Mkdir(folder, os.ModePerm)
-	}
+	limit := 1000
 
 	fileCount := 0
-	fileChannel := make(chan Message, 50)
 
-	go fetchFromChannel(fileChannel)
+	msgChannel := make(chan Message, 50)
+	fileChannel = make(chan string, 1)
+
+	innerFolderPre := "inner_"
+
+	for i := 1; i < 5; i++ {
+		go fetchFromChannel(msgChannel)
+	}
+
+	innerFolder := innerFolderPre + strconv.Itoa(fileCount)
 
 	for fileCount < limit {
+
+		if fileCount%50 == 0 {
+			innerFolder = innerFolderPre + strconv.Itoa(fileCount)
+		}
+		if _, err := os.Stat(innerFolder); os.IsNotExist(err) {
+			os.MkdirAll(folder+"/"+innerFolder, os.ModePerm)
+		}
 		//create a new file
-		newFile := folder + "/file_" + strconv.Itoa(fileCount)
-		go writeToChannel(fileChannel, newFile)
+		newFile := folder + "/" + innerFolder + "/file_" + strconv.Itoa(fileCount)
+		fileChannel <- newFile
+		go writeToChannel(msgChannel, fileChannel)
+
 		fileCount++
 	}
 
@@ -47,13 +67,20 @@ func fetchFromChannel(fileCh chan Message) {
 	}
 }
 
-func writeToChannel(fileCh chan Message, fileName string) {
-	for i := 1; i <= 1000000; i++ {
-		source := rand.NewSource(time.Now().UnixNano())
-		number := rand.New(source).Int()
+func writeToChannel(fileCh chan Message, fileChannel chan string) {
+	filename := <-fileChannel
+
+	for i := 1; i <= 10000; i++ {
+		var buffer bytes.Buffer
+		for j := 1; j <= 100; j++ {
+			number := rand.Intn(1001)
+
+			buffer.WriteString(strconv.Itoa(number) + ",")
+		}
+
 		message := Message{
-			Filename: fileName,
-			Number:   number,
+			Filename: filename,
+			Number:   buffer.String() + "\n",
 		}
 
 		fileCh <- message
@@ -62,25 +89,23 @@ func writeToChannel(fileCh chan Message, fileName string) {
 
 //spins a new go routine that writes to file
 func writeToFile(message Message) {
-	// fmt.Printf("Recieved Filename:%s, Number: %d\n", message.Filename, message.Number)
-	// return
-	go func() {
-		fileName := message.Filename
-		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0777)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer file.Close()
+	// go func() {
+	fileName := message.Filename
+	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0777)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
 
-		_, err = file.WriteString(strconv.Itoa(message.Number) + "\n")
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
+	_, err = file.WriteString(message.Number)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// }()
 }
 
 //Message Struct
 type Message struct {
 	Filename string
-	Number   int
+	Number   string
 }
