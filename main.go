@@ -27,12 +27,12 @@ func main() {
 
 	fileCount := 0
 
-	msgChannel := make(chan Message, 50)
-	fileChannel = make(chan string, 500)
+	msgChannel := make(chan Message, 10)
+	fileChannel = make(chan string, 50)
 
 	innerFolderPre := "inner_"
 
-	for i := 1; i < 5; i++ {
+	for l := 1; l <= 10; l++ {
 		go fetchFromChannel(msgChannel)
 	}
 
@@ -63,11 +63,11 @@ func main() {
 func fetchFromChannel(fileCh chan Message) {
 	for {
 		message := <-fileCh
-		go writeToFile(message)
+		writeToFile(message)
 	}
 }
 
-func writeToChannel(fileCh chan Message, fileChannel chan string) {
+func writeToChannel(messageChan chan Message, fileChannel chan string) {
 	filename := <-fileChannel
 
 	for i := 1; i <= 10000; i++ {
@@ -83,13 +83,12 @@ func writeToChannel(fileCh chan Message, fileChannel chan string) {
 			Number:   buffer.String() + "\n",
 		}
 
-		fileCh <- message
+		messageChan <- message
 	}
 }
 
 //spins a new go routine that writes to file
 func writeToFile(message Message) {
-	// go func() {
 	fileName := message.Filename
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0777)
 	if err != nil {
@@ -101,7 +100,6 @@ func writeToFile(message Message) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// }()
 }
 
 //Message Struct
