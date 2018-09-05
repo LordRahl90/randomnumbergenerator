@@ -20,13 +20,19 @@ func init() {
 var limit = 100000
 var fileCount = 0
 
+// var done chan struct{}
+
 func main() {
-	runtime.GOMAXPROCS(4)
-	fileChannel := make(chan string, 500)
+	runtime.GOMAXPROCS(6)
+	fileChannel := make(chan string, 100)
 	var innerFolder string
 	innerFolderPre := "inner_"
 
-	go readFromChannel(fileChannel)
+	start := time.Now()
+
+	for k := 1; k <= 100; k++ {
+		go readFromChannel(fileChannel)
+	}
 
 	for limit > fileCount {
 		if fileCount%1000 == 0 {
@@ -41,15 +47,25 @@ func main() {
 		fileCount++
 	}
 
+	close(fileChannel)
+
 	fmt.Scanln()
+	elapsed := time.Since(start)
+
+	fmt.Printf("%d File(s) Generated Successfully withing %s\n", fileCount, elapsed.String())
+
 }
 
 func readFromChannel(fileChannel chan string) {
 	for {
-		filename := <-fileChannel
+		filename, ok := <-fileChannel
 		// we open the file, create 10 worker threads to work on it
-
-		generateNumber(filename)
+		if ok {
+			generateNumber(filename)
+		} else {
+			fmt.Println("No more files to read")
+			break
+		}
 	}
 }
 
@@ -61,12 +77,12 @@ func generateNumber(fileName string) {
 
 			buffer.WriteString(strconv.Itoa(number) + ",")
 		}
-
 		go writeToFile(fileName, buffer.String()+"\n")
 	}
 }
 
 func writeToFile(fileName string, message string) {
+	// fmt.Printf("Writting %s to %s\n", message, fileName)
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0777)
 	if err != nil {
 		log.Fatal(err)
