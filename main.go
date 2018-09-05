@@ -17,30 +17,19 @@ func init() {
 	rand.Seed(time.Now().Unix())
 }
 
-var fileChannel chan string
+var limit = 100000
+var fileCount = 0
 
 func main() {
-
 	runtime.GOMAXPROCS(4)
-	start := time.Now()
-	limit := 100000
-
-	fileCount := 0
-
-	msgChannel := make(chan Message, 10)
-	fileChannel = make(chan string, 50)
-
+	fileChannel := make(chan string, 500)
+	var innerFolder string
 	innerFolderPre := "inner_"
 
-	for l := 1; l <= 10; l++ {
-		go fetchFromChannel(msgChannel)
-	}
+	go readFromChannel(fileChannel)
 
-	innerFolder := innerFolderPre + strconv.Itoa(fileCount)
-
-	for fileCount < limit {
-
-		if fileCount%100 == 0 {
+	for limit > fileCount {
+		if fileCount%1000 == 0 {
 			innerFolder = innerFolderPre + strconv.Itoa(fileCount)
 		}
 		if _, err := os.Stat(innerFolder); os.IsNotExist(err) {
@@ -49,27 +38,22 @@ func main() {
 		//create a new file
 		newFile := folder + "/" + innerFolder + "/file_" + strconv.Itoa(fileCount)
 		fileChannel <- newFile
-		go writeToChannel(msgChannel, fileChannel)
-
 		fileCount++
 	}
-
-	elapsed := time.Since(start)
-	fmt.Printf("Elapsed Time is: %s\n", elapsed.String())
 
 	fmt.Scanln()
 }
 
-func fetchFromChannel(fileCh chan Message) {
+func readFromChannel(fileChannel chan string) {
 	for {
-		message := <-fileCh
-		writeToFile(message)
+		filename := <-fileChannel
+		// we open the file, create 10 worker threads to work on it
+
+		generateNumber(filename)
 	}
 }
 
-func writeToChannel(messageChan chan Message, fileChannel chan string) {
-	filename := <-fileChannel
-
+func generateNumber(fileName string) {
 	for i := 1; i <= 10000; i++ {
 		var buffer bytes.Buffer
 		for j := 1; j <= 100; j++ {
@@ -78,32 +62,19 @@ func writeToChannel(messageChan chan Message, fileChannel chan string) {
 			buffer.WriteString(strconv.Itoa(number) + ",")
 		}
 
-		message := Message{
-			Filename: filename,
-			Number:   buffer.String() + "\n",
-		}
-
-		messageChan <- message
+		go writeToFile(fileName, buffer.String()+"\n")
 	}
 }
 
-//spins a new go routine that writes to file
-func writeToFile(message Message) {
-	fileName := message.Filename
+func writeToFile(fileName string, message string) {
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0777)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
 
-	_, err = file.WriteString(message.Number)
+	_, err = file.WriteString(message)
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-//Message Struct
-type Message struct {
-	Filename string
-	Number   string
 }
